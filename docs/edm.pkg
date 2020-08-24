@@ -1,0 +1,8 @@
+v 3 
+d 'EDM': Package for Empirical Dynamic Modelling and Convergent Cross Mapping in Stata
+d
+d Distribution-Date: 20200815
+d
+F edm.ado
+F edm.sthlp
+f chicago.dta
