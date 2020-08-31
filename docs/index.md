@@ -18,6 +18,8 @@ net install edm, from("https://jinjingli.github.io/edm/") replace
 
 ## Example Data and Do File
 
+[This paper](https://jinjingli.github.io/edm/edm-wp.pdf) describes the use of edm in Stata.
+
 The Chicago crime dataset used in the edm paper can be downloaded [here](https://jinjingli.github.io/edm/chicago.dta).
 
 This [do file](https://jinjingli.github.io/edm/sj-edm.do) contains the a series of examples of the edm command using both a synthetic dataset and the Chicago crime dataset.
