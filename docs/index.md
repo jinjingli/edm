@@ -18,7 +18,7 @@ net install edm, from("https://jinjingli.github.io/edm/") replace
 
 ## Example Data and Do File
 
-[This paper](https://jinjingli.github.io/edm/edm-wp.pdf) describes the use of edm in Stata.
+[This paper](https://jinjingli.github.io/edm/edm-wp.pdf) describes the use of edm in Stata. The slides for the talk given at the QMNET seminar series is available [here](https://jinjingli.github.io/edm/EDM-talk-QMNET.pdf).
 
 The Chicago crime dataset used in the edm paper can be downloaded [here](https://jinjingli.github.io/edm/chicago.dta).
 
