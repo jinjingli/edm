@@ -5,4 +5,7 @@ d Distribution-Date: 20200815
 d
 F edm.ado
 F edm.sthlp
+F edm_MacOSX_x64.plugin
+F edm_Unix_x64.plugin
+F edm_Windows_x64.plugin
 f chicago.dta

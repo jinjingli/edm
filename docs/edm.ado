@@ -1,5 +1,6 @@
-*!version 1.3.8, 15Aug2020, Jinjing Li, National Centre for Social and Economic Modelling, University of Canberra <jinjing.li@canberra.edu.au>
-global EDM_VERSION="1.3.8"
+*!version 1.4.0, 15Oct2020, Jinjing Li, Michael Zyphur, George Sugihara, Edoardo Tescari, Patrick Laub
+*!conact: <jinjing.li@canberra.edu.au>
+global EDM_VERSION="1.4.0"
 program define edm, eclass
 version 14
 if replay() {
@@ -145,8 +146,18 @@ program define edmVersion
 syntax , [test]
 di "${EDM_VERSION}"
 end
+program define edmPluginCheck, rclass
+syntax , [mata]
+if "${EDM_MATA}"=="1"|"`mata'"=="mata" {
+return scalar mata_mode=1
+}
+else {
+cap smap_block_mdap
+return scalar mata_mode=_rc==199
+}
+end
 program define edmExplore, eclass sortpreserve
-syntax anything [if], [e(numlist ascending)] [theta(numlist ascending)] [k(integer 0)] [REPlicate(integer 1)] [seed(integer 0)] [ALGorithm(string)] [tau(integer 1)] [DETails] [Predict(name)] [CROSSfold(integer 0)] [CI(integer 0)] [tp(integer 1)] [COPredict(name)] [copredictvar(string)] [full] [force] [EXTRAembed(string)] [ALLOWMISSing] [MISSINGdistance(real 0)] [dt] [DTWeight(real 0)] [DTSave(name)] [reportrawe] [CODTWeight(real 0)] [dot(integer 1)]
+syntax anything [if], [e(numlist ascending)] [theta(numlist ascending)] [k(integer 0)] [REPlicate(integer 1)] [seed(integer 0)] [ALGorithm(string)] [tau(integer 1)] [DETails] [Predict(name)] [CROSSfold(integer 0)] [CI(integer 0)] [tp(integer 1)] [COPredict(name)] [copredictvar(string)] [full] [force] [EXTRAembed(string)] [ALLOWMISSing] [MISSINGdistance(real 0)] [dt] [DTWeight(real 0)] [DTSave(name)] [reportrawe] [CODTWeight(real 0)] [dot(integer 1)] [mata] [nthreads(integer 0)] [saveinputs(string)] [verbosity(integer 0)]
 if `seed'!=0 {
 set seed `seed'
 }
@@ -191,6 +202,14 @@ loc tmin=r(tmin)
 loc tdelta=r(tdelta)
 loc timevar "`=r(timevar)'"
 loc total_t=int((r(tmax)-r(tmin))/r(tdelta)) + 1
+edmPluginCheck, `mata'
+loc mata_mode=r(mata_mode)
+if "${EDM_VERBOSITY}"!="" {
+loc verbosity=${EDM_VERBOSITY}
+}
+if "${EDM_NTHREADS}"!="" {
+loc nthreads=${EDM_NTHREADS}
+}
 tempvar x y
 tokenize "`anything'"
 loc ori_x "`1'"
@@ -426,6 +445,11 @@ qui sum `=substr("`co_`v''",3,.)' if `touse'==1
 qui gen double `co_`v'_new'=(`=substr("`co_`v''",3,.)' - r(mean))/r(sd)
 loc co_`v' `co_`v'_new'
 }
+else if strpos("`co_`v''",".") >0 {
+tempvar co_`v'_new
+qui gen double `co_`v'_new'=`co_`v'' if `touse'==1
+loc co_`v' `co_`v'_new'
+}
 }
 if (`univariate'==1 & "`co_y'"!="")|(`univariate'==0 & "`co_y'"=="") {
 di as error "Coprediction does not match the main manifold construct"
@@ -530,6 +554,11 @@ di "`crossfold'-fold cross-validation progress (`crossfold' in total)"
 }
 loc finished_rep=0
 }
+numlist "`e'"
+loc e_size=wordcount("`=r(numlist)'")
+numlist "`theta'"
+loc theta_size=wordcount("`=r(numlist)'")
+mat r=J(`=`round'*`theta_size'*`e_size'',4,.)
 forvalues t=1/`round' {
 qui {
 cap drop `train_set' `predict_set' `overlap'
@@ -587,9 +616,27 @@ loc plus_amt=`zcount' + (`parsed_dt'==1) + cond("`algorithm'"=="smap",2,1)
 loc cmdfootnote="Note: Number of neighbours (k) is set to E+`plus_amt'" + char(10)
 }
 loc vars_save ""
+if `mata_mode'==1 {
 mata: smap_block("``manifold''", "", "`x_f'", "`x_p'","`train_set'","`predict_set'",`j',`lib_size',"`overlap'", "`algorithm'", "`vars_save'","`force'", `missingdistance')
+}
+else {
+if "`savesmap'"!="" & ("`algorithm'"=="smap"|"`algorithm'"=="llr") {
+loc vsave_flag=1
+unab vars : `vars_save'
+loc varssv `: word count `vars''
+}
+else {
+loc vsave_flag=0
+loc varssv=0
+}
+loc myvars ``manifold'' `x_f' `x_p' `train_set' `predict_set' `overlap' `vars_save'
+unab vars : ``manifold''
+loc mani `: word count `vars''
+loc pmani_flag=0
+plugin call smap_block_mdap `myvars', `j' `lib_size' "`algorithm'" "`force'" `missingdistance' `mani' `pmani_flag' `vsave_flag' `varssv' `nthreads' `verbosity' `saveinputs'
+}
 qui gen double `mae'=abs( `x_p' - `x_f' ) if `predict_set'==1
-qui sum `mae'
+qui sum `mae', meanonly
 loc rmae=r(mean)
 drop `mae'
 loc current_e=`i' + cond(`report_actuale'==1,`e_offset',0)
@@ -599,8 +646,11 @@ cap gen double `predict'=`x_p'
 qui label variable `predict' "edm prediction result"
 cap replace `predict'=`x_p' if `x_p'!=.
 }
-mat r=(r \ `current_e', `j',`=r(rho)',`rmae')
 loc ++no_of_runs
+mat r[`no_of_runs',1]=`current_e'
+mat r[`no_of_runs',2]=`j'
+mat r[`no_of_runs',3]=r(rho)
+mat r[`no_of_runs',4]=`rmae'
 }
 }
 if `round' > 1 & `dot' >0 {
@@ -624,7 +674,19 @@ qui replace `overlap'=0
 qui replace `co_train_set'=0 if `usable'==0
 tempvar co_x_p
 qui gen double `co_x_p'=.
+if `mata_mode'==1 {
 mata: smap_block("``manifold''", "`co_mapping'", "`x_f'", "`co_x_p'","`co_train_set'","`co_predict_set'",`theta',`lib_size',"`overlap'", "`algorithm'", "","`force'",`missingdistance')
+}
+else {
+loc myvars ``manifold'' `x_f' `co_x_p' `co_train_set' `co_predict_set' `overlap' `co_mapping' `vars_save'
+unab vars : ``manifold''
+loc mani `: word count `vars''
+unab vars : `co_mapping'
+loc pmani `: word count `vars''
+loc pmani_flag=1
+loc vsave_flag=0
+plugin call smap_block_mdap `myvars', `theta' `lib_size' "`algorithm'" "`force'" `missingdistance' `mani' `pmani_flag' `vsave_flag' `pmani' `nthreads' `verbosity' `saveinputs'
+}
 qui gen double `copredict'=`co_x_p'
 qui label variable `copredict' "edm copredicted `copredictvar' using manifold `ori_x' `ori_y'"
 }
@@ -633,7 +695,6 @@ di as error "Error: coprediction can only run with one specified manifold constr
 di as result ""
 }
 }
-mat r=r[2...,.]
 mat cfull=r[1,3]
 loc cfullname=subinstr("`ori_x'",".","/",.)
 matrix colnames cfull=`cfullname'
@@ -701,10 +762,11 @@ if `parsed_dt'==0 {
 ereturn local cmdfootnote "`cmdfootnote'Note: dt option is ignored due to lack of variations in time delta"
 }
 }
+ereturn local mode=cond(`mata_mode'==1, "mata","plugin")
 edmDisplay
 end
 program define edmXmap, eclass sortpreserve
-syntax anything [if], [e(integer 2)] [theta(real 1)] [Library(numlist)] [seed(integer 0)] [k(integer 0)] [ALGorithm(string)] [tau(integer 1)] [REPlicate(integer 1)] [SAVEsmap(string)] [DETails] [DIrection(string)] [Predict(name)] [CI(integer 0)] [tp(integer 0)] [COPredict(name)] [copredictvar(string)] [force] [EXTRAembed(string)] [ALLOWMISSing] [MISSINGdistance(real 0)] [dt] [DTWeight(real 0)] [DTSave(name)] [oneway] [savemanifold(name)] [CODTWeight(real 0)] [dot(integer 1)]
+syntax anything [if], [e(integer 2)] [theta(real 1)] [Library(numlist)] [seed(integer 0)] [k(integer 0)] [ALGorithm(string)] [tau(integer 1)] [REPlicate(integer 1)] [SAVEsmap(string)] [DETails] [DIrection(string)] [Predict(name)] [CI(integer 0)] [tp(integer 0)] [COPredict(name)] [copredictvar(string)] [force] [EXTRAembed(string)] [ALLOWMISSing] [MISSINGdistance(real 0)] [dt] [DTWeight(real 0)] [DTSave(name)] [oneway] [savemanifold(name)] [CODTWeight(real 0)] [dot(integer 1)] [mata] [nthreads(integer 0)] [saveinputs(string)] [verbosity(integer 0)]
 if `seed'!=0 {
 set seed `seed'
 }
@@ -789,6 +851,14 @@ loc total_t=(r(tmax)-r(tmin))/r(tdelta) + 1
 marksample touse
 markout `touse' `timevar' `panel_id'
 sort `panel_id' `timevar'
+edmPluginCheck, `mata'
+loc mata_mode=r(mata_mode)
+if "${EDM_VERBOSITY}"!="" {
+loc verbosity=${EDM_VERBOSITY}
+}
+if "${EDM_NTHREADS}"!="" {
+loc nthreads=${EDM_NTHREADS}
+}
 tokenize "`anything'"
 loc ori_x "`1'"
 loc ori_y "`2'"
@@ -1035,6 +1105,11 @@ qui sum `=substr("`co_`v''",3,.)' if `touse'==1
 qui gen double `co_`v'_new'=(`=substr("`co_`v''",3,.)' - r(mean))/r(sd)
 loc co_`v' `co_`v'_new'
 }
+else if strpos("`co_`v''",".") >0 {
+tempvar co_`v'_new
+qui gen double `co_`v'_new'=`co_`v'' if `touse'==1
+loc co_`v' `co_`v'_new'
+}
 }
 if ("`co_y'"=="")|("`co_x'"=="") {
 di as error "Coprediction does not match the main manifold construct"
@@ -1108,6 +1183,13 @@ if `replicate' > 1 & `round'==1 & `dot' >0 {
 di "Replication progress (`=`replicate'*`max_round'' in total)"
 loc finished_rep=0
 }
+numlist "`e'"
+loc e_size=wordcount("`=r(numlist)'")
+numlist "`theta'"
+loc theta_size=wordcount("`=r(numlist)'")
+numlist "`l'"
+loc l_size=wordcount("`=r(numlist)'")
+mat r`round'=J(`=`replicate'*`theta_size'*`e_size'*`l_size'',4,.)
 forvalues rep=1/`replicate' {
 cap drop `u' `urank'
 qui gen double `u'=runiform() if `usable'==1
@@ -1172,7 +1254,25 @@ exit(100)
 loc ++counter
 }
 }
+if `mata_mode'==1 {
 mata: smap_block("``manifold''","", "`x_f'", "`x_p'","`train_set'","`predict_set'",`j',`k_size', "`overlap'", "`algorithm'","`vars_save'","`force'",`missingdistance')
+}
+else {
+if "`savesmap'"!="" & ("`algorithm'"=="smap"|"`algorithm'"=="llr") {
+loc vsave_flag=1
+unab vars : `vars_save'
+loc varssv `: word count `vars''
+}
+else {
+loc vsave_flag=0
+loc varssv=0
+}
+loc myvars ``manifold'' `x_f' `x_p' `train_set' `predict_set' `overlap' `vars_save'
+unab vars : ``manifold''
+loc mani `: word count `vars''
+loc pmani_flag=0
+plugin call smap_block_mdap `myvars', `j' `k_size' "`algorithm'" "`force'" `missingdistance' `mani' `pmani_flag' `vsave_flag' `varssv' `nthreads' `verbosity' `saveinputs'
+}
 tempvar mae
 qui gen double `mae'=abs( `x_p' - `x_f' ) if `predict_set'==1
 qui sum `mae'
@@ -1185,9 +1285,12 @@ cap gen double `predict'=`x_p'
 qui label variable `predict' "edm prediction result"
 cap replace `predict'=`x_p' if `x_p'!=.
 }
-mat r`round'=(r`round' \ `round', `lib_size',`=r(rho)',`rmae')
-drop `overlap'
 loc ++no_of_runs
+mat r`round'[`no_of_runs',1]=`round'
+mat r`round'[`no_of_runs',2]=`lib_size'
+mat r`round'[`no_of_runs',3]=r(rho)
+mat r`round'[`no_of_runs',4]=`rmae'
+drop `overlap'
 }
 }
 }
@@ -1219,7 +1322,6 @@ loc cmdfootnote "Note: dt option is ignored in at least one direction"
 }
 }
 }
-mat r`round'=r`round'[2...,.]
 }
 if `replicate' > 1 & `dot' >0 {
 if mod(`finished_rep',50*`dot')!=0 {
@@ -1232,7 +1334,19 @@ qui gen byte `overlap'=0
 qui replace `co_train_set'=0 if `usable'==0
 tempvar co_x_p
 qui gen double `co_x_p'=.
+if `mata_mode'==1 {
 mata: smap_block("``manifold''","`co_mapping'", "`x_f'", "`co_x_p'","`co_train_set'","`co_predict_set'",`last_theta',`k_size', "`overlap'", "`algorithm'","","`force'",`missingdistance')
+}
+else {
+loc myvars ``manifold'' `x_f' `co_x_p' `co_train_set' `co_predict_set' `overlap' `co_mapping' `vars_save'
+unab vars : ``manifold''
+loc mani `: word count `vars''
+unab vars : `co_mapping'
+loc pmani `: word count `vars''
+loc pmani_flag=1
+loc vsave_flag=0
+plugin call smap_block_mdap `myvars', `last_theta' `k_size' "`algorithm'" "`force'" `missingdistance' `mani' `pmani_flag' `vsave_flag' `pmani' `nthreads' `verbosity' `saveinputs'
+}
 qui gen double `copredict'=`co_x_p'
 qui label variable `copredict' "edm copredicted `copredictvar' using manifold `ori_x' `ori_y'"
 }
@@ -1308,6 +1422,7 @@ ereturn local extraembed="(time delta)"
 else {
 ereturn local extraembed="`parsed_extravars'"
 }
+ereturn local mode=cond(`mata_mode'==1, "mata","plugin")
 edmDisplay
 end
 program define edmDisplay, eclass
@@ -1746,3 +1861,4 @@ return(r)
 }
 }
 end
+cap program smap_block_mdap, plugin using(edm_`=c(os)'_x`=c(bit)'.plugin)
