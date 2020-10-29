@@ -1,6 +1,6 @@
-*!version 1.4.0, 15Oct2020, Jinjing Li, Michael Zyphur, George Sugihara, Edoardo Tescari, Patrick Laub
+*!version 1.4.1, 29Oct2020, Jinjing Li, Michael Zyphur, George Sugihara, Edoardo Tescari, Patrick Laub
 *!conact: <jinjing.li@canberra.edu.au>
-global EDM_VERSION="1.4.0"
+global EDM_VERSION="1.4.1"
 program define edm, eclass
 version 14
 if replay() {
@@ -153,6 +153,9 @@ return scalar mata_mode=1
 }
 else {
 cap smap_block_mdap
+if _rc==199 {
+di as text "Warning: Using slow (mata) edm implementation (failed to load the compiled plugin)"
+}
 return scalar mata_mode=_rc==199
 }
 end
@@ -304,7 +307,7 @@ gen `co_`v'_new'=`=substr("`co_`v''",3,.)' if `touse'==1
 }
 else {
 if "`co_`v''"!="" {
-gen `co_`v'_new'=`=`co_`v''' if `touse'==1
+gen `co_`v'_new'=`co_`v'' if `touse'==1
 }
 else {
 continue
@@ -317,10 +320,10 @@ tempvar newt_co
 sort `original_id' `original_t'
 `byori' gen `newt_co'=_n
 if "`original_id'"!=""{
-xtset `original_id' `newt_co'
+qui xtset `original_id' `newt_co'
 }
 else {
-tsset `newt_co'
+qui tsset `newt_co'
 }
 tempvar dt_value_co
 gen double `dt_value_co'=d.`original_t'
@@ -335,10 +338,10 @@ merge m:1 `original_id' `original_t' using `updatedt_co', assert(master match) n
 }
 sort `original_id' `newt'
 if "`original_id'"!=""{
-xtset `original_id' `newt'
+qui xtset `original_id' `newt'
 }
 else {
-tsset `newt'
+qui tsset `newt'
 }
 if!inlist("`parsed_dtsave'","",".") {
 clonevar `parsed_dtsave'=`dt_value'
@@ -504,10 +507,10 @@ loc co_mapping "`co_mapping_`i''"
 gen byte `co_predict_set'=`co_usable'==1
 if `parsed_dt'==1 {
 if "`original_id'"!=""{
-xtset `original_id' `newt'
+qui xtset `original_id' `newt'
 }
 else {
-tsset `newt'
+qui tsset `newt'
 }
 }
 }
@@ -933,10 +936,10 @@ tempvar newt
 sort `original_id' `original_t'
 `byori' gen `newt'=_n
 if "`original_id'"!=""{
-xtset `original_id' `newt'
+qui xtset `original_id' `newt'
 }
 else {
-tsset `newt'
+qui tsset `newt'
 }
 tempvar dt_value
 gen double `dt_value'=d.`original_t'
@@ -958,7 +961,7 @@ gen `co_`v'_new'=`=substr("`co_`v''",3,.)' if `touse'==1
 }
 else {
 if "`co_`v''"!="" {
-gen `co_`v'_new'=`=`co_`v''' if `touse'==1
+gen `co_`v'_new'=`co_`v'' if `touse'==1
 }
 else {
 continue
@@ -971,10 +974,10 @@ tempvar newt_co
 sort `original_id' `original_t'
 `byori' gen `newt_co'=_n
 if "`original_id'"!=""{
-xtset `original_id' `newt_co'
+qui xtset `original_id' `newt_co'
 }
 else {
-tsset `newt_co'
+qui tsset `newt_co'
 }
 tempvar dt_value_co
 gen double `dt_value_co'=d.`original_t'
@@ -990,10 +993,10 @@ merge m:1 `original_id' `original_t' using `updatedt_co', assert(master match) n
 sum `original_t' `newt'
 sort `original_id' `newt'
 if "`original_id'"!=""{
-xtset `original_id' `newt'
+qui xtset `original_id' `newt'
 }
 else {
-tsset `newt'
+qui tsset `newt'
 }
 if!inlist("`parsed_dtsave'","",".") {
 clonevar `parsed_dtsave'=`dt_value'
@@ -1084,10 +1087,10 @@ if ("`copredictvar'"!="") & (`comap_constructed'==0) {
 if `parsed_dt'==1 {
 qui {
 if "`original_id'"!=""{
-xtset `original_id' `newt_co'
+qui xtset `original_id' `newt_co'
 }
 else {
-tsset `newt_co'
+qui tsset `newt_co'
 }
 }
 }
