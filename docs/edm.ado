@@ -1,6 +1,6 @@
 *!version 1.4.1, 29Oct2020, Jinjing Li, Michael Zyphur, George Sugihara, Edoardo Tescari, Patrick Laub
 *!conact: <jinjing.li@canberra.edu.au>
-global EDM_VERSION="1.4.1"
+global EDM_VERSION="1.4.2"
 program define edm, eclass
 version 14
 if replay() {
@@ -12,6 +12,24 @@ edmDisplay `0'
 exit `rc'
 }
 else edmParser `0'
+end
+program define edmTop, rclass
+if (`"`e(cmd)'"'=="edm" & `"`e(subcommand)'"'=="explore" ) {
+qui {
+frame
+loc current_frame=r(currentframe)
+frame create edm_result_top
+frame change edm_result_top
+svmat e(explore_result), names(col)
+gsort -c3 c4
+noi list c1-c4 in 1/`=min(_N,10)'
+frame change `current_frame'
+frame drop edm_result_top
+}
+}
+else {
+di "top can only be used after edm explore"
+}
 end
 program define edmDisplayCI, rclass
 syntax , mat(name) ci(integer) [maxr(integer 2)]
@@ -87,6 +105,9 @@ edmUpdate `subargs'
 }
 else if "`subcommand'"=="version" {
 edmVersion `subargs'
+}
+else if "`subcommand'"=="top" {
+edmTop `subargs'
 }
 else {
 qui xtset
@@ -636,7 +657,19 @@ loc myvars ``manifold'' `x_f' `x_p' `train_set' `predict_set' `overlap' `vars_sa
 unab vars : ``manifold''
 loc mani `: word count `vars''
 loc pmani_flag=0
+scalar edm_running=1
 plugin call smap_block_mdap `myvars', `j' `lib_size' "`algorithm'" "`force'" `missingdistance' `mani' `pmani_flag' `vsave_flag' `varssv' `nthreads' `verbosity' `saveinputs'
+nobreak {
+while edm_running {
+capture noi break sleep 10
+if _rc {
+di "Aborting edm run"
+scalar edm_running=0
+exit 1
+}
+}
+}
+plugin call smap_block_mdap `myvars' if `predict_set'==1
 }
 qui gen double `mae'=abs( `x_p' - `x_f' ) if `predict_set'==1
 qui sum `mae', meanonly
@@ -688,7 +721,20 @@ unab vars : `co_mapping'
 loc pmani `: word count `vars''
 loc pmani_flag=1
 loc vsave_flag=0
+scalar edm_running=1
 plugin call smap_block_mdap `myvars', `theta' `lib_size' "`algorithm'" "`force'" `missingdistance' `mani' `pmani_flag' `vsave_flag' `pmani' `nthreads' `verbosity' `saveinputs'
+nobreak {
+capture
+while edm_running {
+capture noi break sleep 10
+if _rc {
+di "Aborting edm run"
+scalar edm_running=0
+exit 1
+}
+}
+}
+plugin call smap_block_mdap `myvars' if `co_predict_set'==1
 }
 qui gen double `copredict'=`co_x_p'
 qui label variable `copredict' "edm copredicted `copredictvar' using manifold `ori_x' `ori_y'"
@@ -1274,7 +1320,19 @@ loc myvars ``manifold'' `x_f' `x_p' `train_set' `predict_set' `overlap' `vars_sa
 unab vars : ``manifold''
 loc mani `: word count `vars''
 loc pmani_flag=0
+scalar edm_running=1
 plugin call smap_block_mdap `myvars', `j' `k_size' "`algorithm'" "`force'" `missingdistance' `mani' `pmani_flag' `vsave_flag' `varssv' `nthreads' `verbosity' `saveinputs'
+nobreak {
+while edm_running {
+capture noi break sleep 10
+if _rc {
+di "Aborting edm run"
+scalar edm_running=0
+exit 1
+}
+}
+}
+plugin call smap_block_mdap `myvars' if `predict_set'==1
 }
 tempvar mae
 qui gen double `mae'=abs( `x_p' - `x_f' ) if `predict_set'==1
@@ -1348,7 +1406,19 @@ unab vars : `co_mapping'
 loc pmani `: word count `vars''
 loc pmani_flag=1
 loc vsave_flag=0
+scalar edm_running=1
 plugin call smap_block_mdap `myvars', `last_theta' `k_size' "`algorithm'" "`force'" `missingdistance' `mani' `pmani_flag' `vsave_flag' `pmani' `nthreads' `verbosity' `saveinputs'
+nobreak {
+while edm_running {
+capture noi break sleep 10
+if _rc {
+di "Aborting edm run"
+scalar edm_running=0
+exit 1
+}
+}
+}
+plugin call smap_block_mdap `myvars' if `co_predict_set'==1
 }
 qui gen double `copredict'=`co_x_p'
 qui label variable `copredict' "edm copredicted `copredictvar' using manifold `ori_x' `ori_y'"
