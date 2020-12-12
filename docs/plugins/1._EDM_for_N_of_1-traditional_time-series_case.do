@@ -187,6 +187,7 @@ local SPtestreps = 1000   // Number of permutation replications to generate null
 * Note 1: With many initial bootstrap replications used for simplex projection, this can save substantial time with large N and T
 local SPtestplot = "yes"   // Set "yes" or "no" to finalize and plot the results of the SPtest
 local SMAPtest = "yes"   // Set "yes" or "no" for bootstrap test of improved prediction at best theta>0 versus theta=0
+* Note 1: The seed for paired bootstrapped S-map tests is seed(12345) unless 'options' list contains a different seed() value
 local SMAPtestreps = 1000   // Number of bootstrap replications for SMAPtest
 * Note 1: This test reuses any SMAP bootstrap reps 'SMAPreps', so new reps for theta=0 and theta>0 are 2(SMAPtestreps - SMAPreps)
 local SMAPtestplot = "yes"   // Set "yes" or "no" to finalize and plot the results of the SMAPtest
@@ -244,7 +245,6 @@ local CCMlinefit = "fpfit"   // Set "lfit", "qfit", or "fpfit" for linear, quadr
 * Note 1: Line fitting helps when different panel IDs have different E or N values, and thus different minimum and maximum library sizes
 * Note 2: If library sizes and prediction quality differs across panel IDs, grand-mean lines will be unhelpful without line-fitting
 local CCMlaggraph = "yes"   // Set "yes" or "no" for plots of average rho (y-axis) for CCM at different lags (x-axis)
-* Note: 
 local CCMlagsave = "yes"   // Set "yes" or "no" to save and replace or not save the CCM plots
 local CCMlaglinefit = ""   // Set "lfit", "qfit", or "fpfit" for linear, quadratic, or fractional polynomial fit; default is nothing
 local CCMSMAPgraph = "yes"   // Set "yes" or "no" for plots of CCM coefficients derived from the SMAP method
@@ -319,6 +319,16 @@ loc i = `i' + 1
 }
 }
 
+
+* Override default S-map test seed setting if seed appears in 'options' list
+tokenize `options'
+loc smapseed = "seed(12345)"
+loc i = 1
+while "``i''" != "" {
+loc first=substr("``i''",1,4)
+if "`first'" == "seed" loc smapseed = ""
+loc i = `i' + 1
+}
 
 
 * Create variables to allow dropping zeros in initial Simplex Projections
@@ -1097,7 +1107,7 @@ foreach var of varlist `variables' {
 					di "S-map test theta==`i', Variable == `var', SMAP test"
 					di "-------------------------------------------------------------------------------"
 					capture {
-						qui edm explore `prestd'd`diff'.`var' if `panelvar'==`id' ``var'dropzes', e(`emax`var'`id'') seed(123456) alg(smap) rep(`SMAPtestreps') theta(`i') k(`kval') `forcing' `time_gap' `missings' extra(`extras`diff'' `extras_raw') `tweight' `mdistance' reportrawe `options'
+						qui edm explore `prestd'd`diff'.`var' if `panelvar'==`id' ``var'dropzes', e(`emax`var'`id'') `smapseed' alg(smap) rep(`SMAPtestreps') theta(`i') k(`kval') `forcing' `time_gap' `missings' extra(`extras`diff'' `extras_raw') `tweight' `mdistance' reportrawe `options'
 					}
 					capture {
 						mata: `Blong'=st_matrix("e(explore_result)")
@@ -1115,7 +1125,7 @@ getmata (SMAPtestl`var'*)=`SMAPtestl`var'', force double
 label variable SMAPtestl`var'1 "SMAP long test results, ID = 1"
 rename SMAPtestl`var'1 SMAPtestl_id_`var'
 recast long SMAPtestl_id_`var'
-label variable SMAPtestl`var'2 "SMAP long test results, paired replication number using seed()"
+label variable SMAPtestl`var'2 "SMAP long test results, paired replication number"
 rename SMAPtestl`var'2 SMAPtestl_rep_`var'
 recast long SMAPtestl_rep_`var'
 label variable SMAPtestl`var'3 "SMAP long test E value (optimal E from original SP)"
