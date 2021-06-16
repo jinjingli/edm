@@ -4,7 +4,7 @@
 {title:edm Description}
 
 {p 4 4 2}  The command {bf:edm} implements a series of tools that can be used for empirical dynamic
-modeling in Stata. The core algorithm is written in Mata to achieve reasonable execution speed. The
+modeling in Stata. The core algorithm is written in C++ (with a Mata backup) to achieve reasonable execution speed. The
 command keyword is {bf:edm}, and should be immediately followed by a subcommand such as explore or
 xmap. A dataset must be declared as time-series or panel data by the tsset or xtset command prior to
 using the edm command, and time-series operators including l., f., d., and s. can be used (the last
@@ -13,10 +13,10 @@ for seasonal differencing).
 
 {title:Syntax}
 
-{p 4 4 2}  The {bf:explore} subcommand follows the syntax below and supports either one or two
-variables for exploration using simplex projection or S-mapping.
+{p 4 4 2}  The {bf:explore} subcommand follows the syntax below and supports one
+variable for exploration using simplex projection or S-mapping.
 
-{p 8 12 2}  {bf:edm} explore {bf:variables} [if {bf:exp}], [e({it:numlist} ascending)]
+{p 8 12 2}  {bf:edm} explore {bf:variable} [if {bf:exp}], [e({it:numlist} ascending)]
 [tau(integer)] [theta(numlist ascending)] [k(integer)] [algorithm(string)] [replicate(integer)]
 [seed(integer)] [full] [predict(variable)] [copredict(variable)] [copredictvar(variables)]
 [crossfold(integer)] [ci(integer)] [extraembed(variables)] [allowmissing] [missingdistance(real)]
@@ -34,7 +34,7 @@ different purpose of the analysis.
 [missingdistance(real)] [dt] [dtweight(real)] [dtsave(name)] [oneway] [details] [savesmap(string)]
 [force]
 
-{p 4 4 2} The third subcommand {bf:update} updates the command to its latest version
+{p 4 4 2} The third subcommand {bf:update} updates the plugin to its latest version
 
 {p 8 12 2}  {bf:edm} update, [develop] [replace]
 
@@ -60,7 +60,7 @@ which essentially sorts the data by the multiple τ. This is done by specifying 
 that take the form: t,t-1τ,…,t-(E-1)τ, where the default is tau(1) (i.e., typical lags). However, if
 tau(2) is set then every-other t is used to reconstruct the attractor and make predictions—this does
 not halve the observed sample size because both odd and even t would be used to construct the set of
-embedding vectors for analysis. This option is helpful when data are oversampled (i.e., space too
+embedding vectors for analysis. This option is helpful when data are oversampled (i.e., spaced too
 closely in time) and therefore very little new information about a dynamic system is added at each
 occasion. However, the tau() setting is also useful if different dynamics occur at different times
 scales, and can be chosen to reflect a researcher’s theory-driven interest in a specific time-scale
@@ -175,7 +175,10 @@ default, the distance is set to the expected distance of two random draws in a n
 which equals to 2/sqrt(pi) * standard deviation of the mapping variable.
 
 {phang}  {bf:extraembed(variables)}: This option allows incorporating additional variables into the
-embedding (multivariate embedding), e.g. extra(z l.z)
+embedding (multivariate embedding), e.g. extra(z l.z). Time series lists are unabbreviated here,
+e.g. extra(L(1/3).z) will be equivalent to extra(L1.z L2.z L3.z). Normally, lagged versions of the
+extra variables are not included in the embedding, however the syntax extra(z(e)) includes e lags
+of z in the embedding.
 
 {phang}  {bf:dt}: This option allows automatic inclusion of the timestamp differencing in the
 embedding. Generally, there will be E-1 dt variables included for an embedding with E dimensions. By

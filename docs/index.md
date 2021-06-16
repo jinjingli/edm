@@ -13,8 +13,10 @@ ssc install edm, replace
 To install the latest development version directly through Stata:
 
 ~~~
-net install edm, from("https://jinjingli.github.io/edm/") replace
+net install edm, from("https://raw.githubusercontent.com/EDM-Developers/edm-releases/master/") replace
 ~~~
+
+The source code for the package is available [here](https://github.com/EDM-Developers/EDM).
 
 ## Example Data and Do File
 
