@@ -10,10 +10,10 @@ To install the stable version directly through Stata:
 ssc install edm, replace
 ~~~
 
-To install the latest development version directly through Stata:
+To install the latest development version, first install the stable version from SSC then inside Stata run:
 
 ~~~
-net install edm, from("https://raw.githubusercontent.com/EDM-Developers/edm-releases/master/") replace
+edm update, development replace
 ~~~
 
 The source code for the package is available [here](https://github.com/EDM-Developers/EDM).
